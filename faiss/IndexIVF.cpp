@@ -11,6 +11,7 @@
 
 
 #include <omp.h>
+#include <emmintrin.h>
 #include <mutex>
 
 #include <algorithm>
@@ -268,22 +269,20 @@ void IndexIVF::set_direct_map_type (DirectMap::Type type)
 void IndexIVF::search (idx_t n, const float *x, idx_t k,
                          float *distances, idx_t *labels) const
 {
-//    std::unique_ptr<idx_t[]> idx(new idx_t[n * nprobe]);
-//    std::unique_ptr<float[]> coarse_dis(new float[n * nprobe]);
-
     idx_t* idx = reinterpret_cast<idx_t*>(faiss::malloc_huge(n * nprobe * sizeof(idx_t)));
     float* coarse_dis = reinterpret_cast<float*>(faiss::malloc_huge(n * nprobe * sizeof(float)));
 
-//    double t0 = getmillisecs();
+    double t0 = getmillisecs();
     quantizer->search (n, x, nprobe, coarse_dis, idx);
-//    indexIVF_stats.quantization_time += getmillisecs() - t0;
+    indexIVF_stats.quantization_time += getmillisecs() - t0;
 
-//    t0 = getmillisecs();
+    t0 = getmillisecs();
     invlists->prefetch_lists (idx, n * nprobe);
 
+    _mm_prefetch((char*)(x), _MM_HINT_T0);
     search_preassigned (n, x, k, idx, coarse_dis,
                         distances, labels, false);
-//    indexIVF_stats.search_time += getmillisecs() - t0;
+    indexIVF_stats.search_time += getmillisecs() - t0;
 
     munmap(idx, n * nprobe * sizeof(idx_t));
     munmap(coarse_dis, n * nprobe * sizeof(idx_t));
@@ -418,7 +417,7 @@ void IndexIVF::search_preassigned (idx_t n, const float *x, idx_t k,
 
         if (pmode == 0) {
 
-#pragma omp for
+#pragma omp for schedule(static)
             for (idx_t i = 0; i < n; i++) {
 
                 if (interrupt) {

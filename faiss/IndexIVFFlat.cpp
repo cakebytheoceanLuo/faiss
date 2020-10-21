@@ -9,6 +9,7 @@
 
 #include <faiss/IndexIVFFlat.h>
 
+#include <emmintrin.h>
 #include <cinttypes>
 #include <cstdio>
 
@@ -156,6 +157,7 @@ struct IVFFlatScanner: InvertedListScanner {
         size_t nup = 0;
         for (size_t j = 0; j < list_size; j++) {
             const float * yj = list_vecs + d * j;
+            _mm_prefetch((char*)(yj), _MM_HINT_T0);
             float dis = metric == METRIC_INNER_PRODUCT ?
                 fvec_inner_product (xi, yj, d) : fvec_L2sqr (xi, yj, d);
             if (C::cmp (simi[0], dis)) {
