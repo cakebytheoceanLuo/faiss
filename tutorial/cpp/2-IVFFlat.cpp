@@ -13,10 +13,12 @@
 #include <faiss/IndexFlat.h>
 #include <faiss/IndexIVFFlat.h>
 
+#include "PerfEvent.hpp"
+
 using idx_t = faiss::Index::idx_t;
 
 int main() {
-    int d = 64;                            // dimension
+    int d = 512;                           // dimension
     int nb = 100000;                       // database size
     int nq = 10000;                        // nb of queries
 
@@ -48,22 +50,21 @@ int main() {
     index.train(nb, xb);
     assert(index.is_trained);
     index.add(nb, xb);
+    index.nprobe = 10;
 
     {       // search xq
         idx_t *I = new idx_t[k * nq];
         float *D = new float[k * nq];
 
-        index.search(nq, xq, k, D, I);
+        {
+            PerfEvent e;
+            e.startCounters();
 
-        printf("I=\n");
-        for(int i = nq - 5; i < nq; i++) {
-            for(int j = 0; j < k; j++)
-                printf("%5zd ", I[i * k + j]);
-            printf("\n");
+            index.search(nq, xq, k, D, I);
+
+            e.stopCounters();
+            e.printReport(std::cout, nq);
         }
-
-        index.nprobe = 10;
-        index.search(nq, xq, k, D, I);
 
         printf("I=\n");
         for(int i = nq - 5; i < nq; i++) {
