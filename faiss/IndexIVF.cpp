@@ -24,6 +24,7 @@
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/IndexFlat.h>
 #include <faiss/impl/AuxIndexStructures.h>
+#include <faiss/impl/HugeMalloc.h>
 
 namespace faiss {
 
@@ -267,19 +268,25 @@ void IndexIVF::set_direct_map_type (DirectMap::Type type)
 void IndexIVF::search (idx_t n, const float *x, idx_t k,
                          float *distances, idx_t *labels) const
 {
-    std::unique_ptr<idx_t[]> idx(new idx_t[n * nprobe]);
-    std::unique_ptr<float[]> coarse_dis(new float[n * nprobe]);
+//    std::unique_ptr<idx_t[]> idx(new idx_t[n * nprobe]);
+//    std::unique_ptr<float[]> coarse_dis(new float[n * nprobe]);
 
-    double t0 = getmillisecs();
-    quantizer->search (n, x, nprobe, coarse_dis.get(), idx.get());
-    indexIVF_stats.quantization_time += getmillisecs() - t0;
+    idx_t* idx = reinterpret_cast<idx_t*>(faiss::malloc_huge(n * nprobe * sizeof(idx_t)));
+    float* coarse_dis = reinterpret_cast<float*>(faiss::malloc_huge(n * nprobe * sizeof(float)));
 
-    t0 = getmillisecs();
-    invlists->prefetch_lists (idx.get(), n * nprobe);
+//    double t0 = getmillisecs();
+    quantizer->search (n, x, nprobe, coarse_dis, idx);
+//    indexIVF_stats.quantization_time += getmillisecs() - t0;
 
-    search_preassigned (n, x, k, idx.get(), coarse_dis.get(),
+//    t0 = getmillisecs();
+    invlists->prefetch_lists (idx, n * nprobe);
+
+    search_preassigned (n, x, k, idx, coarse_dis,
                         distances, labels, false);
-    indexIVF_stats.search_time += getmillisecs() - t0;
+//    indexIVF_stats.search_time += getmillisecs() - t0;
+
+    munmap(idx, n * nprobe * sizeof(idx_t));
+    munmap(coarse_dis, n * nprobe * sizeof(idx_t));
 }
 
 
@@ -312,7 +319,7 @@ void IndexIVF::search_preassigned (idx_t n, const float *x, idx_t k,
             nprobe * n > 1);
 
 
-#pragma omp parallel if(do_parallel) reduction(+: nlistv, ndis, nheap)
+#pragma omp parallel if(do_parallel) reduction(+: nlistv, ndis, nheap) num_threads(8)
     {
         InvertedListScanner *scanner = get_InvertedListScanner(store_pairs);
         ScopeDeleter1<InvertedListScanner> del(scanner);
@@ -457,7 +464,7 @@ void IndexIVF::search_preassigned (idx_t n, const float *x, idx_t k,
                 scanner->set_query (x + i * d);
                 init_result (local_dis.data(), local_idx.data());
 
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(static)
                 for (long ik = 0; ik < nprobe; ik++) {
                     ndis += scan_one_list
                         (keys [i * nprobe + ik],
@@ -492,7 +499,7 @@ void IndexIVF::search_preassigned (idx_t n, const float *x, idx_t k,
                 init_result (distances + i * k, labels + i * k);
             }
 
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(static)
             for (int64_t ij = 0; ij < n * nprobe; ij++) {
                 size_t i = ij / nprobe;
                 size_t j = ij % nprobe;

@@ -47,6 +47,7 @@ add_library(faiss
   impl/index_write.cpp
   impl/io.cpp
   impl/lattice_Zn.cpp
+  impl/HugeMalloc.cpp
   utils/Heap.cpp
   utils/WorkerThread.cpp
   utils/distances.cpp
@@ -106,6 +107,7 @@ set(FAISS_HEADERS
   impl/io_macros.h
   impl/lattice_Zn.h
   impl/platform_macros.h
+  impl/HugeMalloc.h
   utils/Heap.h
   utils/WorkerThread.h
   utils/distances.h
