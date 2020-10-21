@@ -12,21 +12,22 @@
 
 #include <faiss/IndexFlat.h>
 #include <faiss/IndexIVFFlat.h>
+#include <faiss/impl/HugeMalloc.h>
 
 #include "PerfEvent.hpp"
 
 using idx_t = faiss::Index::idx_t;
 
 int main() {
-    int d = 512;                           // dimension
-    int nb = 100000;                       // database size
-    int nq = 10000;                        // nb of queries
+    static constexpr int d = 512;                           // dimension
+    static constexpr int nb = 100000;                       // database size
+    static constexpr int nq = 10000;                        // nb of queries
 
     std::mt19937 rng;
     std::uniform_real_distribution<> distrib;
 
-    float *xb = new float[d * nb];
-    float *xq = new float[d * nq];
+    float *xb = reinterpret_cast<float*>(faiss::malloc_huge(d * nb * sizeof(float)));
+    float *xq = reinterpret_cast<float*>(faiss::malloc_huge(d * nq * sizeof(float)));
 
     for(int i = 0; i < nb; i++) {
         for(int j = 0; j < d; j++)
@@ -41,8 +42,8 @@ int main() {
     }
 
 
-    int nlist = 100;
-    int k = 4;
+    static constexpr int nlist = 100;
+    static constexpr int k = 4;
 
     faiss::IndexFlatL2 quantizer(d);       // the other index
     faiss::IndexIVFFlat index(&quantizer, d, nlist);
@@ -53,8 +54,8 @@ int main() {
     index.nprobe = 10;
 
     {       // search xq
-        idx_t *I = new idx_t[k * nq];
-        float *D = new float[k * nq];
+        idx_t *I = reinterpret_cast<idx_t*>(faiss::malloc_huge(k * nq * sizeof(idx_t)));
+        float *D = reinterpret_cast<float*>(faiss::malloc_huge(k * nq * sizeof(float)));
 
         {
             PerfEvent e;
@@ -73,14 +74,14 @@ int main() {
             printf("\n");
         }
 
-        delete [] I;
-        delete [] D;
+        munmap(I, k * nq * sizeof(idx_t));
+        munmap(D, k * nq * sizeof(float));
     }
 
 
 
-    delete [] xb;
-    delete [] xq;
+    munmap(xb, d * nb * sizeof(float));
+    munmap(xq, d * nq * sizeof(float));
 
     return 0;
 }
