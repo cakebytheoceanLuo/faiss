@@ -29,16 +29,25 @@ int main() {
     float *xb = reinterpret_cast<float*>(faiss::malloc_huge(d * nb * sizeof(float)));
     float *xq = reinterpret_cast<float*>(faiss::malloc_huge(d * nq * sizeof(float)));
 
+    int32_t *xb_int = reinterpret_cast<int32_t*>(faiss::malloc_huge(d * nb * sizeof(int32_t)));
+    int32_t *xq_int = reinterpret_cast<int32_t*>(faiss::malloc_huge(d * nq * sizeof(int32_t)));
+
     for(int i = 0; i < nb; i++) {
-        for(int j = 0; j < d; j++)
+        for(int j = 0; j < d; j++) {
             xb[d * i + j] = distrib(rng);
+            xb_int[d * i + j] = static_cast<int32_t>(xb[d * i + j]);
+        }
         xb[d * i] += i / 1000.;
+        xb_int[d * i] += i / 1000;
     }
 
     for(int i = 0; i < nq; i++) {
-        for(int j = 0; j < d; j++)
+        for(int j = 0; j < d; j++) {
             xq[d * i + j] = distrib(rng);
+            xq_int[d * i + j] = static_cast<int32_t>(xq[d * i + j]);
+        }
         xq[d * i] += i / 1000.;
+        xq_int[d * i] += i / 1000;
     }
 
 
@@ -61,7 +70,7 @@ int main() {
             PerfEvent e;
             e.startCounters();
 
-            index.search(nq, xq, k, D, I);
+            index.search_new(nq, xq, xq_int, k, D, I);
 
             e.stopCounters();
             e.printReport(std::cout, nq);

@@ -135,6 +135,12 @@ struct IVFFlatScanner: InvertedListScanner {
         this->xi = query;
     }
 
+    const int *xi_int;
+    void set_query_new (const float *query, const int *query_int) override {
+        this->xi = query;
+        this->xi_int = query_int;
+    }
+
     idx_t list_no;
     void set_list (idx_t list_no, float /* coarse_dis */) override {
         this->list_no = list_no;

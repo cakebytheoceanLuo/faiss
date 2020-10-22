@@ -187,9 +187,20 @@ struct IndexIVF: Index, Level1Quantizer {
                                      const IVFSearchParameters *params=nullptr
                                      ) const;
 
+    void search_preassigned_new (idx_t n, const float *x, const int *x_int, idx_t k,
+                             const idx_t *assign,
+                             const float *centroid_dis,
+                             float *distances, idx_t *labels,
+                             bool store_pairs,
+                             const IVFSearchParameters *params=nullptr
+    ) const;
+
     /** assign the vectors, then call search_preassign */
     void search (idx_t n, const float *x, idx_t k,
                  float *distances, idx_t *labels) const override;
+
+    void search_new (idx_t n, const float *x, const int *x_int, idx_t k,
+                 float *distances, idx_t *labels) const;
 
     void range_search (idx_t n, const float* x, float radius,
                        RangeSearchResult* result) const override;
@@ -315,6 +326,8 @@ struct InvertedListScanner {
 
     /// from now on we handle this query.
     virtual void set_query (const float *query_vector) = 0;
+
+    virtual void set_query_new (const float *query, const int *query_int) = 0;
 
     /// following codes come from this inverted list
     virtual void set_list (idx_t list_no, float coarse_dis) = 0;
